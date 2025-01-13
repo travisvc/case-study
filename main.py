@@ -13,7 +13,7 @@ from sklearn.metrics import explained_variance_score
 
 from visualize import visualize_data
 
-# Load and preprocess the data
+# Loading the data
 data = pd.read_csv("kc_house_data.csv")
 data = data.drop(['id', 'date'], axis=1)
 print(data.head())

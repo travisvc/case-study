@@ -27,12 +27,12 @@ y = data.iloc[:, 0].values
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 0)
 
 # Random Forest Regression Model
-rf_regressor = RandomForestRegressor(n_estimators=28,random_state=0)
-rf_regressor.fit(X_train,y_train)
-rf_regressor.score(X_test,y_test)
+rf_regressor = RandomForestRegressor(n_estimators = 28, random_state = 0)
+rf_regressor.fit(X_train, y_train)
+rf_regressor.score(X_test, y_test)
 rf_pred = rf_regressor.predict(X_test)
-rf_score = rf_regressor.score(X_test,y_test)
-expl_rf = explained_variance_score(rf_pred,y_test)
+rf_score = rf_regressor.score(X_test, y_test)
+expl_rf = explained_variance_score(rf_pred, y_test)
 
 # Models score 
 print("Random Forest Regression Model Score is ", round(rf_score, 2))

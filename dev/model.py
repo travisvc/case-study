@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import explained_variance_score
@@ -21,11 +22,12 @@ class OnlineRandomForest:
         self.beta = beta
         self._lambda = _lambda
         self.F = [DecisionTreeRegressor(random_state=t) for t in range(T)]  # Forest of trees
+        self.node_structure = [{} for _ in range(T)]  # To keep track of nodes and children
 
     def fit(self, X, y):
-        """
-        Initial training of the forest with bootstrap samples.
-        """
+        """ Initial training of the forest with bootstrap samples. """
+        self.X_full, self.y_full = X, y
+
         for t in range(self.T):
             bootstrap_indices = np.random.choice(len(X), len(X), replace=True)
             X_bootstrap, y_bootstrap = X[bootstrap_indices], y[bootstrap_indices]
@@ -40,138 +42,17 @@ class OnlineRandomForest:
         - y_new: New target data.
         """
         for t in range(self.T):  # For each tree in the forest
-            # Determine how many updates to perform for this tree
-            k = np.random.poisson(self._lambda)
-            if k > 0:
-                for u in range(k):  # Perform k updates
-                    # Step 1: Find the leaf node for the new sample
-                    leaf = self.find_leaf(self.F[t], X_new)
-                    R_j = leaf["samples"]  # Samples in the current node
+            # Combine stored training data with new data
+            if not hasattr(self, "X_full"):
+                self.X_full, self.y_full = X_new, y_new  # Initialize storage
+            else:
+                self.X_full = np.vstack([self.X_full, X_new])
+                self.y_full = np.hstack([self.y_full, y_new])
 
-                    # Step 2: Check splitting conditions
-                    if len(R_j) > self.alpha:  # Check if enough samples are present
-                        # Step 3: Generate random tests
-                        S = self.generate_random_tests(X_new)
-
-                        # Step 4: Calculate gains for all tests in S and compute statistics
-                        gains, p_j, p_jls, p_jrs = self.calculate_gains_and_statistics(
-                            R_j, S, X_new, y_new
-                        )
-
-                        # Step 5: Check if any gain exceeds beta
-                        if any(gain > self.beta for gain in gains):
-                            # Step 6: Find the best test that maximizes the gain
-                            best_test_index = np.argmax(gains)
-                            best_test = S[best_test_index]
-
-                            # Step 7: Perform the split using p_jls and p_jrs
-                            self.create_left_child(p_jls[best_test_index])
-                            self.create_right_child(p_jrs[best_test_index])
-
-    def find_leaf(self, tree, X):
-        """
-        Find the leaf node in the tree for a given sample.
-        """
-        node_ids = tree.apply(X)
-        samples = [np.where(node_ids == i)[0] for i in np.unique(node_ids)]
-        return {"samples": samples}
-
-    def generate_random_tests(self, X):
-        """
-        Generate a set of random tests for splitting.
-
-        Returns:
-        A list of tests, where each test is represented as (feature, threshold).
-        """
-        N = 10  # Number of random tests
-        tests = []
-        for _ in range(N):
-            feature = np.random.randint(0, X.shape[1])
-            threshold = np.random.uniform(X[:, feature].min(), X[:, feature].max())
-            tests.append((feature, threshold))
-        return tests
-
-    def calculate_gains_and_statistics(self, R_j, S, X, y):
-        """
-        Calculate gains and compute statistics (p_j, p_jls, p_jrs) for each test in S.
-
-        Parameters:
-        - R_j: Samples in the current node.
-        - S: Set of random tests.
-        - X: Feature data.
-        - y: Target data.
-
-        Returns:
-        - gains: List of gains for each test.
-        - p_j: Statistics of class labels in the current node.
-        - p_jls: List of statistics for the left split for each test.
-        - p_jrs: List of statistics for the right split for each test.
-        """
-        current_indices = R_j
-        y_current = y[current_indices]
-
-        # Calculate statistics for the current node
-        p_j = self.calculate_statistics(y_current)
-
-        gains = []
-        p_jls = []
-        p_jrs = []
-
-        for s in S:
-            # Split data based on the test
-            left_indices = X[current_indices, s[0]] < s[1]
-            right_indices = ~left_indices
-
-            y_left = y_current[left_indices]
-            y_right = y_current[right_indices]
-
-            # Calculate statistics for left and right splits
-            p_left = self.calculate_statistics(y_left)
-            p_right = self.calculate_statistics(y_right)
-
-            # Calculate impurities
-            left_impurity = self.calculate_impurity(y_left)
-            right_impurity = self.calculate_impurity(y_right)
-            total_impurity = self.calculate_impurity(y_current)
-
-            # Calculate gain
-            gain = total_impurity - (len(y_left) / len(y_current)) * left_impurity - \
-                   (len(y_right) / len(y_current)) * right_impurity
-
-            # Store results
-            gains.append(gain)
-            p_jls.append(p_left)
-            p_jrs.append(p_right)
-
-        return gains, p_j, p_jls, p_jrs
-
-    def calculate_statistics(self, y):
-        """
-        Calculate class label statistics (label density).
-        """
-        if len(y) == 0:
-            return np.array([0])  # Empty split, no statistics
-        unique, counts = np.unique(y, return_counts=True)
-        probabilities = counts / len(y)
-        return probabilities
-
-    def calculate_impurity(self, y):
-        """
-        Calculate the impurity (e.g., variance for regression).
-        """
-        return np.var(y) if len(y) > 0 else 0
-
-    def create_left_child(self, p_jls):
-        """
-        Create the left child node using statistics for the left split.
-        """
-        print(f"Creating left child with statistics: {p_jls}")
-
-    def create_right_child(self, p_jrs):
-        """
-        Create the right child node using statistics for the right split.
-        """
-        print(f"Creating right child with statistics: {p_jrs}")
+            # Refit the tree with the updated dataset
+            bootstrap_indices = np.random.choice(len(self.X_full), len(self.X_full), replace=True)
+            X_bootstrap, y_bootstrap = self.X_full[bootstrap_indices], self.y_full[bootstrap_indices]
+            self.F[t].fit(X_bootstrap, y_bootstrap)
 
     def predict(self, X):
         """
@@ -187,7 +68,7 @@ class OnlineRandomForest:
 
 
 # Loading the data
-data = pd.read_csv("kc_house_data.csv")
+data = pd.read_csv("../kc_house_data.csv")
 data = data.drop(["id", "date"], axis=1)
 
 X = data.iloc[:, 1:].values
@@ -197,16 +78,38 @@ y = data.iloc[:, 0].values
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
 
 # Initialize and train the online random forest
-online_rf = OnlineRandomForest(T=10, alpha=5, beta=0.1, _lambda=1)
+online_rf = OnlineRandomForest(T=100, alpha=5, beta=0.1, _lambda=1)
 online_rf.fit(X_train, y_train)
 
+# Predict and evaluate
+predictions = online_rf.predict(X_test)
+r2_score = explained_variance_score(y_test, predictions)
+
+print(f"\n=== Initial Online Random Forest ===")
+print("\nR^2 Score:", round(r2_score, 2))
+
+# Visualize tree depths before the update
+print("\nTree Depths Before Update:")
+tree_depths_before = [tree.get_depth() for tree in online_rf.F]
+for i, depth in enumerate(tree_depths_before):
+    print(f"Tree {i}: Depth {depth}")
+
 # Simulate new observations and update the model
-X_new = X_test[:10]  # Example: Taking some test data as new observations
-y_new = y_test[:10]
+X_new = X_test[:100]  # Example: Taking some test data as new observations
+y_new = y_test[:100]
 online_rf.update(X_new, y_new)
 
 # Predict and evaluate
 predictions = online_rf.predict(X_test)
 r2_score = explained_variance_score(y_test, predictions)
 
-print("\nUpdated Online Random Forest R^2 Score:", round(r2_score, 2))
+print(f"\n\n=== Updated Online Random Forest ===")
+print("\nR^2 Score:", round(r2_score, 2))
+
+# Visualize tree depths after the update
+print("\nTree Depths After Update:")
+tree_depths_after = [tree.get_depth() for tree in online_rf.F]
+for i, depth in enumerate(tree_depths_after):
+    print(f"Tree {i}: Depth {depth}")
+
+print('')

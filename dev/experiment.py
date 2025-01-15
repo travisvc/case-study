@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import explained_variance_score
 
-from model import OnlineRandomForest
+from dev.split_model import OnlineRandomForest
 
 # Loading the data
 data = pd.read_csv("kc_house_data.csv")

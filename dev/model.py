@@ -75,17 +75,17 @@ X = data.iloc[:, 1:].values
 y = data.iloc[:, 0].values
 
 # Split data into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0) 
+
+print(f"\n=== Initial Online Random Forest ===")
 
 # Initialize and train the online random forest
 online_rf = OnlineRandomForest(T=100, alpha=5, beta=0.1, _lambda=1)
 online_rf.fit(X_train, y_train)
 
 # Predict and evaluate
-predictions = online_rf.predict(X_test)
-r2_score = explained_variance_score(y_test, predictions)
-
-print(f"\n=== Initial Online Random Forest ===")
+predictions = online_rf.predict(X_test[1000:])
+r2_score = explained_variance_score(y_test[1000:], predictions)
 print("\nR^2 Score:", round(r2_score, 2))
 
 # Visualize tree depths before the update
@@ -94,16 +94,16 @@ tree_depths_before = [tree.get_depth() for tree in online_rf.F]
 for i, depth in enumerate(tree_depths_before):
     print(f"Tree {i}: Depth {depth}")
 
+print(f"\n\n=== Updated Online Random Forest ===")
+
 # Simulate new observations and update the model
-X_new = X_test[:100]  # Example: Taking some test data as new observations
-y_new = y_test[:100]
+X_new = X_test[:1000]  # Example: Taking some test data as new observations
+y_new = y_test[:1000]
 online_rf.update(X_new, y_new)
 
 # Predict and evaluate
 predictions = online_rf.predict(X_test)
 r2_score = explained_variance_score(y_test, predictions)
-
-print(f"\n\n=== Updated Online Random Forest ===")
 print("\nR^2 Score:", round(r2_score, 2))
 
 # Visualize tree depths after the update

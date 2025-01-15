@@ -3,10 +3,10 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import explained_variance_score
 
-from dev.split_model import OnlineRandomForest
+from model import OnlineRandomForest
 
 # Loading the data
-data = pd.read_csv("kc_house_data.csv")
+data = pd.read_csv("../kc_house_data.csv")
 data = data.drop(["id", "date"], axis=1)
 
 X = data.iloc[:, 1:].values
@@ -35,7 +35,9 @@ for repeat in range(repeats):
     y_train_shuffled = y_train[shuffled_indices]
     
     # Incrementally update the model using the shuffled data
-    for i in range(len(X_train_shuffled)):
+    for i in range(20):
+    # for i in range(len(X_train_shuffled)):
+        print(f'Updating iteration: {i}')
         X_new = X_train_shuffled[i:i+1]  # Single sample as a batch
         y_new = y_train_shuffled[i:i+1]
         online_rf.update(X_new, y_new)
